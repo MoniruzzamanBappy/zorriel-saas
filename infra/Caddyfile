@@ -1,0 +1,18 @@
+# Cloudflare sits in front (proxied, SSL mode "Full (strict)").
+# Caddy serves the Cloudflare origin certificate for the root and wildcard domains.
+{
+	auto_https disable_certs
+}
+
+{$ROOT_DOMAIN}, *.{$ROOT_DOMAIN} {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+
+	@api host api.{$ROOT_DOMAIN}
+	handle @api {
+		reverse_proxy api:4000
+	}
+	handle {
+		reverse_proxy admin:3000
+	}
+	encode zstd gzip
+}

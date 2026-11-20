@@ -1,0 +1,64 @@
+# Production stack for the Hostinger VPS. Run from the repo root:
+#   docker compose -f infra/docker-compose.yml --env-file .env up -d --build
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment: [ROOT_DOMAIN]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro   # Cloudflare origin certificate (see README)
+      - caddy_data:/data
+    depends_on: [admin, api]
+
+  admin:
+    build: { context: .., dockerfile: apps/admin/Dockerfile }
+    restart: unless-stopped
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      API_URL: http://api:4000
+
+  api:
+    build: { context: .., dockerfile: apps/api/Dockerfile }
+    restart: unless-stopped
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      DATABASE_URL: postgres://zorriel_app:${APP_DB_PASSWORD}@postgres:5432/zorriel
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
+  migrate:
+    build: { context: .., dockerfile: packages/db/Dockerfile.migrate }
+    environment:
+      DATABASE_ADMIN_URL: postgres://zorriel_owner:${OWNER_DB_PASSWORD}@postgres:5432/zorriel
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      OWNER_DB_PASSWORD: ${OWNER_DB_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      - ./db-init.sql:/db-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zorriel"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes: [redis_data:/data]
+
+volumes:
+  caddy_data:
+  pg_data:
+  redis_data:

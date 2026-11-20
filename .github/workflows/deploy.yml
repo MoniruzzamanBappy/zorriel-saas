@@ -1,0 +1,23 @@
+name: Deploy
+on:
+  workflow_dispatch:
+  # Turn on once the VPS is set up:
+  # push:
+  #   branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/zorriel/app
+            git fetch origin main && git reset --hard origin/main
+            docker compose -f infra/docker-compose.yml --env-file /opt/zorriel/.env up -d --build
+            docker image prune -f

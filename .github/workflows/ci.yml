@@ -1,0 +1,30 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      DATABASE_ADMIN_URL: postgres://zorriel_owner:dev@localhost:5432/zorriel
+      DATABASE_URL: postgres://zorriel_app:dev@localhost:5432/zorriel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Create database roles
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -v owner_password=dev -v app_password=dev -f infra/db-init.sql
+      - run: pnpm build
+      - run: pnpm db:migrate
+      - run: pnpm test

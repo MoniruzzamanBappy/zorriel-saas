@@ -1,0 +1,20 @@
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none h-9 px-4",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        outline: "border border-border bg-background hover:bg-muted",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  },
+);
+
+export function Button({ className, variant, ...props }: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
+  return <button className={cn(buttonVariants({ variant }), className)} {...props} />;
+}
+export { buttonVariants };
